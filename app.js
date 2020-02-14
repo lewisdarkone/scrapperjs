@@ -1,33 +1,46 @@
 const cheerio =require("cheerio");
 const fs = require('fs');
 const request = require('request');
+const books = require('./utils');
+const lectura = require('./lectura');
 
 
-const url = "https://www.ciudadredonda.org/calendario-lecturas/evangelio-del-dia/hoy";
+let url = "https://www.ciudadredonda.org/calendario-lecturas/evangelio-del-dia/hoy";
+
+//https://www.ciudadredonda.org/calendario-lecturas/evangelio-del-dia/hoy
+//https://www.ciudadredonda.org/calendario-lecturas/evangelio-del-dia/?f=2020-01-
 
 
-request(url, (err,res,body) =>{
-    let books = getBookFile();
+let test = 
+//[START REQUEST]
+request(url, (err,res,body) =>{       
 
     if(!err && res.statusCode == 200){
 
-        //load body over cheerio
+        /**
+         * load body over cheerio
+         */
         let $ = cheerio.load(body);
 
-        //get main data to extra books and chapters
+        /**
+         * get main data to extra books and chapters
+         */
         let bodyMap = new Map();
 
-        //set data from page
+        /**
+         *get sections that contain the daily words 
+         */
+        //
         $('section','.lecturas').each((i,elem) =>{
             let childNodes = $(elem.childNodes).toArray();
             switch (i) {
                 case 0:
-                    bodyMap.set('mLectTitle',lecturaTitle(childNodes));
-                    bodyMap.set('mLectText',lecturaTextSp(childNodes));
+                    bodyMap.set('mLectTitle',lectura.getTitle(childNodes));
+                    bodyMap.set('mLectText',lectura.getLecturaText(childNodes));
                     break;
                 case 2:
-                    bodyMap.set('mEvanTitle',lecturaTitle(childNodes));
-                    bodyMap.set('mEvantText',lecturaTextSp(childNodes));
+                    bodyMap.set('mEvanTitle',lectura.getTitle(childNodes));
+                    bodyMap.set('mEvantText',lectura.getLecturaText(childNodes));
                     break;            
                 default:
                     break;
@@ -35,62 +48,60 @@ request(url, (err,res,body) =>{
 
         });
 
+        /**
+         * Variables to get books, chapters and verses
+         */
+        let finalLectBook = books.getBookOfText(bodyMap.get("mLectTitle"));
+        let finalLectChapterAndVerses = lectura.getChapterAndVerse(bodyMap.get("mLectTitle"));        
+        let finalEvanBook =books.getBookOfText(bodyMap.get("mEvanTitle"));
+        let finalEvanChapterAndVerses = lectura.getChapterAndVerse(bodyMap.get("mEvanTitle"));
+
+        /**
+         * Maps to storage the dailyWord: lectures and evangelions
+         */
+        let dailyWord = new Map();
+        let dailyLectura = new Map();
+        let dailyEvan = new Map();
+
+      
+
+        /**
+         * Set dailyLecture
+         */
+        dailyLectura
+        .set('finalLectBook',finalLectBook)
+        .set('chapter',finalLectChapterAndVerses.get('chapter'))
+        .set('startVerse',finalLectChapterAndVerses.get('startVerse'))
+        .set('endVerse',finalLectChapterAndVerses.get('endVerse'));
+
+        /**
+         * Set daily Evan
+         */
+        dailyEvan
+        .set('finalLectBook',finalEvanBook)
+        .set('chapter',finalEvanChapterAndVerses.get('chapter'))
+        .set('startVerse',finalEvanChapterAndVerses.get('startVerse'))
+        .set('endVerse',finalEvanChapterAndVerses.get('endVerse'));
+
+        /**
+         * Set dailyWore
+         */
+        dailyWord
+        .set('dailyLectura',dailyLectura)
+        .set('dailyEvan',dailyEvan);
+
     }
 });
+//[END RESQUEST]
 
-const lecturaTitle = (nodes) =>{
-
-    return nodes[3].childNodes[1].childNodes[0].data;
- }
-
- const lecturaTextSp = (node) =>{
-
-    let textArray = [];
-    let lectura = "";
-    let nodeValue;
-    for(let i = 5; i <= node[3].childNodes.length-1;i++){
-
-        //exclude br
-        if(node[3].childNodes[i].name === "br") continue;
-
-        //append first value default
-        if(i === 5) {
-            textArray.push(node[3].childNodes[i].data)
-        }
-        else{
-            //get final value into nodeValue
-            if(!node[3].childNodes[i].childNodes){
-                nodeValue = node[3].childNodes[i].data;
-            }else{
-                nodeValue = node[3].childNodes[i].childNodes[0].data;
-            }            
-
-            //break if node is palabra de Dios
-            if(nodeValue === 'Palabra de Dios') break;
-
-           if(nodeValue && nodeValue.length > 2){
-               textArray.push(nodeValue);
-           };
-        }
-
-
-    }
-    if(textArray){
-        for (let i = 0; i < textArray.length; i++) {
-            lectura += textArray[i];
-            lectura += "\n";            
-        }
+console.log(test);
+for (let i = 1; i <= 31; i++) {
+    if(i < 9){
+        url=url+'0'+i;
     }else{
-        lectura = "no data";
+        url = url+i;
     }
-    return lectura;
- }
- const getBookFile = (() =>{
-     try {
-        let file = fs.readFileSync('./bibleBooks.txt','utf8');
-        return file
-     } catch (error) {
-         return error;
-     }
+
     
-});
+}
+
